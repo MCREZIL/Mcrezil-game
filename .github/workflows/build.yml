@@ -1,4 +1,4 @@
-name: Build MCREZIL APK
+name: Build MCREZIL GAMES APK
 on: [push]
 jobs:
   build:
@@ -8,8 +8,19 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.0'
+          channel: 'stable'
+
+      # FIX: Generate missing android files
+      - run: |
+          mv lib/main.dart /tmp/main.dart
+          mv android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml
+          flutter create. --project-name mcrezil_game_labs --org com.mcrezil.gamelabs
+          mv /tmp/main.dart lib/main.dart
+          mv /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
       - run: flutter pub get
-      - run: flutter build apk --release
+      - run: flutter build apk --release --no-tree-shake-icons
+
       - uses: actions/upload-artifact@v4
         with:
           name: MCREZIL-GAMES-APK
