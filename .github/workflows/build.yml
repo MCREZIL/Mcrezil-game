@@ -9,19 +9,10 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: stable
-
-      - name: Restore our files
-        run: |
-          cp lib/main.dart /tmp/main.dart
-          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || echo "no manifest"
-          rm -rf android ios web
-          flutter create. --project-name mcrezil_game_labs --org com.mcrezil --platforms android
-          cp /tmp/main.dart lib/main.dart
-          cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
-
+      - run: rm -rf android
+      - run: flutter create. --project-name mcrezil_game_labs --org com.mcrezil --platforms android
       - run: flutter pub get
       - run: flutter build apk --release
-
       - uses: actions/upload-artifact@v4
         with:
           name: MCREZIL-APK-v3.2.1
