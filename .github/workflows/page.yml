@@ -18,6 +18,7 @@ jobs:
           if [ ! -f web/index.html ]; then
             flutter create --project-name mcrezil_game . --platforms web
           fi
+      - run: flutter pub get
       - run: flutter build web --release --base-href /Mcrezil-game/
       - uses: actions/upload-pages-artifact@v3
         with:
