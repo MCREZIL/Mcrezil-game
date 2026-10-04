@@ -1,18 +1,18 @@
-name: Build MCREZIL GAMES APK
-on: [push]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: stable
-      - run: flutter create. --project-name mcrezil_game_labs --org com.mcrezil --platforms android --overwrite
-      - run: flutter pub get
-      - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: MCREZIL-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+import 'package:flutter/material.dart';
+void main()=>runApp(App());
+class App extends StatelessWidget{
+@override
+Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,home:Home());
+}
+class Home extends StatefulWidget{
+@override
+State<Home> createState()=>_H();
+}
+class _H extends State<Home>{
+List<String> p=["Host"];
+bool s=false;
+@override
+Widget build(BuildContext c){
+return Scaffold(backgroundColor:Colors.black,appBar:AppBar(title:Text("MCREZIL v3.2.1"),backgroundColor:Colors.orange),body:Column(children:[Text("CODE: MCREZIL-321",style:TextStyle(color:Colors.white)),Expanded(child:ListView(children:p.map((e)=>ListTile(title:Text(e,style:TextStyle(color:Colors.white)),leading:Icon(Icons.person,color:Colors.orange))).toList())),ElevatedButton(onPressed:(){setState((){if(p.length<10)p.add("Runner ${p.length+1}");});},child:Text("ADD RUNNER")),ElevatedButton(onPressed:(){setState((){s=true;});},child:Text(s?"CHASING...":"START CHASE")),]));
+}
+}
