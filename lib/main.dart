@@ -1,27 +1,9 @@
 import 'package:flutter/material.dart';
-void main()=>runApp(App());
-class App extends StatelessWidget{
-  @override
-  Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,home:Home());
-}
-class Home extends StatefulWidget{
-  @override
-  State<Home> createState()=>_H();
-}
-class _H extends State<Home>{
-  List<String> p=["Host"];
-  bool s=false;
-  @override
-  Widget build(BuildContext c){
-    return Scaffold(
-      backgroundColor:Colors.black,
-      appBar:AppBar(title:Text("MCREZIL v3.2.1"),backgroundColor:Colors.orange),
-      body:Column(children:[
-        Text("CODE: MCREZIL-321",style:TextStyle(color:Colors.white)),
-        Expanded(child:ListView(children:p.map((e)=>ListTile(title:Text(e,style:TextStyle(color:Colors.white)),leading:Icon(Icons.person,color:Colors.orange))).toList())),
-        ElevatedButton(onPressed:(){setState((){if(p.length<10)p.add("Runner ${p.length+1}");});},child:Text("ADD RUNNER")),
-        ElevatedButton(onPressed:(){setState((){s=true;});},child:Text(s?"CHASING...":"START CHASE")),
-      ]),
-    );
-  }
-}
+void main(){runApp(MaterialApp(home:S()));}
+class S extends StatelessWidget{
+@override
+Widget build(BuildContext c){
+return Scaffold(
+appBar: AppBar(title: Text('MCREZIL v3.2.1')),
+body: Center(child: Text('BUILD TEST OK')),
+);}}
