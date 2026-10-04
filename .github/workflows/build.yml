@@ -9,11 +9,10 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: stable
-      - run: rm -rf android
       - run: flutter create. --project-name mcrezil_game_labs --org com.mcrezil --platforms android
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: MCREZIL-APK-v3.2.1
+          name: MCREZIL-APK
           path: build/app/outputs/flutter-apk/app-release.apk
