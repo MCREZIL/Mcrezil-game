@@ -1,67 +1,27 @@
 import 'package:flutter/material.dart';
-
-void main() => runApp(McrezilApp());
-
-class McrezilApp extends StatelessWidget {
+void main()=>runApp(App());
+class App extends StatelessWidget{
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MCREZIL GAME LABS',
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-      home: HomeScreen(),
-    );
-  }
+  Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,home:Home());
 }
-
-class HomeScreen extends StatefulWidget {
+class Home extends StatefulWidget{
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<Home> createState()=>_H();
 }
-
-class _HomeScreenState extends State<HomeScreen> {
-  List<String> players = ["Host (You)"];
-  String gameCode = "MCREZIL-321";
-  bool gameStarted = false;
-
+class _H extends State<Home>{
+  List<String> p=["Host"];
+  bool s=false;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext c){
     return Scaffold(
-      appBar: AppBar(title: Text('MCREZIL v3.2.1'), backgroundColor: Colors.orange[900]),
-      body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: EdgeInsets.all(12),
-              color: Colors.grey[900],
-              child: Text('GAME CODE: $gameCode\nPackage: com.mcrezil.gamelabs\nOffline: Bluetooth + WiFi Direct', style: TextStyle(fontFamily: 'monospace')),
-            ),
-            SizedBox(height: 20),
-            Text('Players (${players.length}/10):', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-           ...players.map((p) => ListTile(title: Text(p), leading: Icon(Icons.person))),
-            Spacer(),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, padding: EdgeInsets.all(16)),
-              onPressed: () => setState(() {
-                if(players.length < 10) players.add("Runner ${players.length + 1}");
-              }),
-              child: Text('ADD RUNNER (Simulate QR Join)', style: TextStyle(fontSize: 18)),
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: EdgeInsets.all(16)),
-              onPressed: () => setState(() => gameStarted = true),
-              child: Text(gameStarted? 'GAME STARTED! CHASING...' : 'START CHASE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            ),
-            if(gameStarted) Padding(
-              padding: EdgeInsets.only(top:10),
-              child: Text('Rules: 2 Hunters, 8 Runners. Host picked BEFORE start. Late joiners = Runners auto.', textAlign: TextAlign.center, style: TextStyle(color: Colors.yellow)),
-            )
-          ],
-        ),
-      ),
+      backgroundColor:Colors.black,
+      appBar:AppBar(title:Text("MCREZIL v3.2.1"),backgroundColor:Colors.orange),
+      body:Column(children:[
+        Text("CODE: MCREZIL-321",style:TextStyle(color:Colors.white)),
+        Expanded(child:ListView(children:p.map((e)=>ListTile(title:Text(e,style:TextStyle(color:Colors.white)),leading:Icon(Icons.person,color:Colors.orange))).toList())),
+        ElevatedButton(onPressed:(){setState((){if(p.length<10)p.add("Runner ${p.length+1}");});},child:Text("ADD RUNNER")),
+        ElevatedButton(onPressed:(){setState((){s=true;});},child:Text(s?"CHASING...":"START CHASE")),
+      ]),
     );
   }
 }
