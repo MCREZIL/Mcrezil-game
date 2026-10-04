@@ -9,7 +9,7 @@ jobs:
         with:
           flutter-version: '3.22.0'
       - run: flutter config --enable-web
-      - run: flutter create . --platforms web --overwrite
+      - run: flutter create --project-name mcrezil_game . --platforms web --overwrite
       - run: flutter build web --release
       - uses: actions/upload-artifact@v4
         with:
