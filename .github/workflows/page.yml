@@ -13,6 +13,11 @@ jobs:
         with:
           flutter-version: '3.22.0'
       - run: flutter config --enable-web
+      - name: Restore web folder if missing
+        run: |
+          if [ ! -f web/index.html ]; then
+            flutter create --project-name mcrezil_game . --platforms web
+          fi
       - run: flutter build web --release --base-href /Mcrezil-game/
       - uses: actions/upload-pages-artifact@v3
         with:
