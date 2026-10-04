@@ -13,7 +13,6 @@ jobs:
         with:
           flutter-version: '3.22.0'
       - run: flutter config --enable-web
-      - run: flutter create --project-name mcrezil_game . --platforms web --overwrite
       - run: flutter build web --release --base-href /Mcrezil-game/
       - uses: actions/upload-pages-artifact@v3
         with:
