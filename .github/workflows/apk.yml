@@ -1,0 +1,25 @@
+name: Build MCREZIL APK
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6'
+      - name: Fix Android folder for old plugin
+        run: |
+          rm -rf android
+          flutter create --platforms android --project-name mcrezil_game .
+      - name: Add mobile plugins
+        run: |
+          flutter pub add nearby_connections qr_flutter permission_handler
+          flutter pub get
+      - name: Build APK
+        run: flutter build apk --release --target lib/main_mobile.dart
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcrezil-games-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
