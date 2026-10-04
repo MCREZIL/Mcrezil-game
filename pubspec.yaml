@@ -1,11 +1,22 @@
 name: mcrezil_game
-description: MCREZIL GAME LABS
-publish_to: none
+description: MCREZIL GAMES - Offline Bluetooth + WiFi Direct Chase
+publish_to: 'none'
 version: 1.0.0+1
+
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=3.2.0 <4.0.0'
+
 dependencies:
   flutter:
     sdk: flutter
+  nearby_connections: ^3.0.0
+  qr_flutter: ^4.1.0
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
 flutter:
   uses-material-design: true
