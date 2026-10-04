@@ -1,15 +1,12 @@
-name: mcrezil_games
-description: MCREZIL GAMES
+name: mcrezil_game_labs
+description: MCREZIL GAME LABS - Chasing Game v3.2.1
 version: 3.2.1
 publish_to: none
-
 environment:
   sdk: '>=3.0.0 <4.0.0'
-
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
-
 flutter:
   uses-material-design: true
