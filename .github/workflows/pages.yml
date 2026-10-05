@@ -1,11 +1,8 @@
-name: MCREZIL Live Website
+name: Build MCREZIL APK
 on:
   push:
     branches: [ main ]
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,40 +10,47 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
-      - run: flutter config --enable-web
-      - name: Force WEB only files
+          flutter-version: '3.19.6'
+
+      - name: Build APK with patched plugin
         run: |
+          rm -rf android
+          flutter create . --platforms android --project-name mcrezil_game
+          
           cat > pubspec.yaml << 'EOF'
           name: mcrezil_game
-          description: MCREZIL GAMES
+          description: MCREZIL GAMES OFFLINE
           publish_to: 'none'
           version: 1.0.0+1
           environment:
-            sdk: '>=3.2.0 <4.0.0'
+            sdk: '>=3.0.0 <4.0.0'
           dependencies:
             flutter:
               sdk: flutter
             qr_flutter: ^4.1.0
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
+            permission_handler: ^11.3.1
+            nearby_connections: ^4.0.0
           flutter:
             uses-material-design: true
           EOF
-          rm -rf web
-          flutter create . --platforms web --project-name mcrezil_game
+          
           flutter pub get
-      - run: flutter build web --release --base-href /Mcrezil-game/
-      - uses: actions/upload-pages-artifact@v3
+          
+          # --- AUTO FIX V1 EMBEDDING ---
+          find $HOME/.pub-cache -name "AndroidManifest.xml" -path "*nearby_connections*" | while read f; do
+            if ! grep -q "flutterEmbedding" "$f"; then
+              sed -i 's/<application/<meta-data android:name="flutterEmbedding" android:value="2" \/>\n        <application/' "$f"
+              echo "Patched $f"
+            fi
+          done
+
+      - name: Add Bluetooth permissions
+        run: |
+          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
+
+      - run: flutter build apk --release --target lib/main_mobile.dart
+
+      - uses: actions/upload-artifact@v4
         with:
-          path: build/web
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
+          name: mcrezil-games-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
