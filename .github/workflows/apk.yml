@@ -3,20 +3,24 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
-          
-      - name: Fix Android & Pubspec for Offline APK
+          flutter-version: '3.13.9'
+
+      - name: Fix everything before build
         run: |
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
+          
           cat > pubspec.yaml << 'EOF'
           name: mcrezil_game
           description: MCREZIL GAMES OFFLINE
@@ -29,21 +33,36 @@ jobs:
               sdk: flutter
             qr_flutter: ^4.1.0
             permission_handler: ^11.3.1
-            nearby_connections:
-              git:
-                url: https://github.com/observerly/nearby_connections.git
-                ref: main
+            nearby_connections: ^4.3.0
           flutter:
             uses-material-design: true
           EOF
+          
           flutter pub get
+          
+          # PATCH 1: Add flutterEmbedding v2
+          find $HOME/.pub-cache -name "AndroidManifest.xml" -path "*nearby_connections*" | while read f; do
+            if ! grep -q "flutterEmbedding" "$f"; then
+              sed -i 's/<application/<meta-data android:name="flutterEmbedding" android:value="2" \/>\n        <application/' "$f"
+            fi
+          done
+          
+          # PATCH 2: Fix deprecated getAuthenticationToken() -> getAuthenticationDigits()
+          find $HOME/.pub-cache -name "NearbyConnectionsPlugin.java" | while read f; do
+            sed -i 's/getAuthenticationToken()/getAuthenticationDigits()/g' "$f"
+            sed -i 's/ConnectionInfo has been deprecated//g' "$f"
+            echo "Patched deprecation in $f"
+          done
+          
+          # PATCH 3: Allow warnings, don't fail on them
+          echo "org.gradle.warning.mode=none" >> android/gradle.properties
 
       - name: Add permissions
         run: |
-          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" \/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" \/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
-        run: flutter build apk --release --target lib/main_mobile.dart
+        run: flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
