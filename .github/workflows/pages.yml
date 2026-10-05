@@ -1,5 +1,7 @@
 name: MCREZIL Live Website
-on: push
+on:
+  push:
+    branches: [ main ]
 permissions:
   contents: read
   pages: write
@@ -10,17 +12,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { flutter-version: '3.22.0' }
+        with:
+          flutter-version: '3.22.0'
       - run: flutter config --enable-web
-      - name: Restore web folder
+      - name: Force WEB only files
         run: |
-          if [ ! -f web/index.html ]; then
-            flutter create --project-name mcrezil_game . --platforms web
-          fi
-      - run: flutter pub get
+          cat > pubspec.yaml << 'EOF'
+          name: mcrezil_game
+          description: MCREZIL GAMES
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.2.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            qr_flutter: ^4.1.0
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+          flutter:
+            uses-material-design: true
+          EOF
+          rm -rf web
+          flutter create . --platforms web --project-name mcrezil_game
+          flutter pub get
       - run: flutter build web --release --base-href /Mcrezil-game/
       - uses: actions/upload-pages-artifact@v3
-        with: { path: build/web }
+        with:
+          path: build/web
   deploy:
     needs: build
     runs-on: ubuntu-latest
