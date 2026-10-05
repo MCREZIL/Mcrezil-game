@@ -1,37 +1,43 @@
 name: Build APK
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
+on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+        with: {distribution: 'temurin', java-version: '17'}
       - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
+        with: {flutter-version: '3.22.3'}
 
-      - name: Fix Kotlin 1.7 -> 1.9.22
+      - name: Recreate Android
         run: |
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
           
-          # Patch ALL gradle files (new template uses settings.gradle)
-          find android -name "*.gradle" -type f -exec sed -i "s/1\.7\.1/1.9.22/g; s/1\.7\.10/1.9.22/g; s/1\.8\.0/1.9.22/g; s/1\.8\.22/1.9.22/g; s/1\.9\.10/1.9.22/g" {} \; || true
-          sed -i "s/ext.kotlin_version.*/ext.kotlin_version = '1.9.22'/" android/build.gradle || true
-          echo "=== Kotlin versions ==="
-          grep -r "kotlin" android/settings.gradle || true
-          grep -r "kotlin_version" android/build.gradle || true
-          
-          cat > pubspec.yaml << 'EOF'
+          cat > android/settings.gradle << 'SET'
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties or -Pflutter.sdk not set."
+                  return flutterSdkPath
+              }()
+              settings.ext.flutterSdkPath = flutterSdkPath()
+              includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "7.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+          }
+          include ":app"
+          SET
+
+          cat > pubspec.yaml << 'PUB'
           name: mcrezil_game
-          description: MCREZIL OFFLINE
           publish_to: 'none'
           version: 1.0.0+1
           environment:
@@ -43,16 +49,10 @@ jobs:
             nearby_connections: ^4.3.0
           flutter:
             uses-material-design: true
-          EOF
+          PUB
           flutter pub get
-
-      - name: Add permissions
-        run: |
-          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" \/>\n    <application/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
       - run: flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
-
       - uses: actions/upload-artifact@v4
-        with:
-          name: mcrezil-games-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+        with: {name: mcrezil-games-apk, path: build/app/outputs/flutter-apk/app-release.apk}
