@@ -1,103 +1,104 @@
-// MCREZIL GAMES - OFFLINE CHASE V1.0 FINAL
-// Same features you asked: Bluetooth + WiFi Direct + QR, 100% offline
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:nearby_connections/nearby_connections.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:math';
 
-void main() => runApp(const MaterialApp(debugShowCheckedModeBanner:false, home: McrezilLobby()));
+void main() => runApp(McrezilApp());
 
-enum Role { hunter, runner }
-
-class Player {
-  String id; String name; Role role; bool isHost;
-  Player({required this.id, required this.name, this.role=Role.runner, this.isHost=false});
-}
-
-class McrezilLobby extends StatefulWidget {
-  const McrezilLobby({super.key});
-  @override State<McrezilLobby> createState() => _McrezilLobbyState();
-}
-
-class _McrezilLobbyState extends State<McrezilLobby> {
-  List<Player> players = [Player(id:"host", name:"You (Host)", role:Role.hunter, isHost:true)];
-  bool started = false;
-  String roomCode = "MCREZIL-${Random().nextInt(9000)+1000}";
-  final Strategy strategy = Strategy.P2P_CLUSTER; // best for games
-
+class McrezilApp extends StatelessWidget {
   @override
-  void initState(){ super.initState(); _startHost(); }
-
-  Future<void> _startHost() async {
-    await Nearby().startAdvertising(
-      "MCREZIL-Host", strategy,
-      onConnectionInitiated: (id, info){
-        if(players.length>=10){ Nearby().rejectConnection(id); return; }
-        Nearby().acceptConnection(id, onPayLoadRecieved: (a,p){});
-      },
-      onConnectionResult: (id, status){
-        if(status==Status.CONNECTED){
-          setState((){
-            if(started){
-              players.add(Player(id:id, name:"Runner ${players.length+1}", role:Role.runner));
-            } else {
-              players.add(Player(id:id, name:"Player ${players.length+1}", role:Role.runner));
-            }
-          });
-        }
-      },
-      onDisconnected: (id)=> setState(()=> players.removeWhere((p)=>p.id==id)),
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: McrezilChase(),
     );
   }
+}
 
-  void _start(){
-    if(players.length<2) return;
-    if(players.where((p)=>p.role==Role.hunter).isEmpty) return;
-    setState(()=> started=true);
-    Nearby().sendBytesPayloadToAll("START");
+class McrezilChase extends StatefulWidget {
+  @override
+  _McrezilChaseState createState() => _McrezilChaseState();
+}
+
+class _McrezilChaseState extends State<McrezilChase> with SingleTickerProviderStateMixin {
+  double playerX = 0.5, playerY = 0.8;
+  List<Map<String,double>> hunters = [];
+  int score = 0;
+  bool playing = false;
+  late AnimationController controller;
+
+  @override
+  void initState(){
+    super.initState();
+    controller = AnimationController(vsync: this, duration: Duration(milliseconds: 16))..addListener(update);
+  }
+  
+  void start(){
+    hunters = List.generate(3, (i)=> {'x': Random().nextDouble(), 'y': Random().nextDouble()*0.5});
+    score = 0;
+    playerX = 0.5; playerY = 0.8;
+    playing = true;
+    controller.repeat();
+  }
+  
+  void update(){
+    if(!playing) return;
+    setState((){
+      for(var h in hunters){
+        double dx = playerX - h['x']!;
+        double dy = playerY - h['y']!;
+        double d = sqrt(dx*dx + dy*dy);
+        if(d < 0.07){ playing = false; controller.stop(); return; }
+        h['x'] = h['x']! + dx/d * 0.002;
+        h['y'] = h['y']! + dy/d * 0.002;
+      }
+      score++;
+    });
   }
 
   @override
   Widget build(BuildContext context){
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1026),
-      body: Column(children:[
-        const SizedBox(height:40),
-        Center(child: QrImageView(data:"MCREZIL://$roomCode", size:130, backgroundColor: Colors.white)),
-        const SizedBox(height:10),
-        Text("MCREZIL GAMES • Room $roomCode", style:const TextStyle(color:Color(0xFF00FF88), fontWeight:FontWeight.w900)),
-        const Text("Bluetooth + WiFi Direct • 100% Offline", style:TextStyle(color:Colors.amber, fontSize:11)),
-        const SizedBox(height:10),
-        Expanded(child: GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2, childAspectRatio:1.3),
-          itemCount:10,
-          itemBuilder: (c,i){
-            if(i>=players.length) return const Card(color:Colors.white10, child: Center(child: Text("+ Invite Player")));
-            var p=players[i];
-            return Card(color: p.role==Role.hunter? Colors.red.withOpacity(0.2) : Colors.green.withOpacity(0.2),
-              child: Column(mainAxisAlignment:MainAxisAlignment.center, children:[
-                Text(p.name, style:const TextStyle(color:Colors.white, fontWeight:FontWeight.bold)),
-                const SizedBox(height:6),
-                Row(mainAxisAlignment:MainAxisAlignment.center, children:[
-                  ChoiceChip(label:const Text("HUNTER", style:TextStyle(fontSize:9)), selected:p.role==Role.hunter, onSelected: started? null : (_)=> setState(()=> p.role=Role.hunter)),
-                  const SizedBox(width:4),
-                  ChoiceChip(label:const Text("RUNNER", style:TextStyle(fontSize:9)), selected:p.role==Role.runner, onSelected: started? null : (_)=> setState(()=> p.role=Role.runner)),
-                ])
-              ]),
-            );
-          },
-        )),
-        Padding(padding: const EdgeInsets.all(12), child:
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), minimumSize: const Size(double.infinity, 55)),
-            onPressed: _start,
-            child: Text("START MCREZIL GAME (${players.length}/10)", style: const TextStyle(color:Colors.black, fontWeight:FontWeight.w900)),
-          )
-        ),
-        if(started) const Text("Game Started! Late joiners = Runners only", style:TextStyle(color:Colors.green, fontSize:11)),
-        const SizedBox(height:10),
+      backgroundColor: Colors.black,
+      body: Stack(children:[
+        // Game area
+        Positioned.fill(child: CustomPaint(painter: GamePainter(playerX, playerY, hunters))),
+        // UI
+        Column(children:[
+          SizedBox(height: 50),
+          Center(child: Text('MCREZIL', style: TextStyle(color: Color(0xFF00FF88), fontSize: 48, fontWeight: FontWeight.bold))),
+          Center(child: Text('CHASE', style: TextStyle(color: Colors.white, fontSize: 28, letterSpacing: 8))),
+          SizedBox(height: 10),
+          Text('You scored $score', style: TextStyle(color: Colors.white70)),
+          SizedBox(height: 20),
+          if(!playing) ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF00FF88), padding: EdgeInsets.symmetric(horizontal: 60, vertical: 20), shape: StadiumBorder()),
+            onPressed: start,
+            child: Text('PLAY', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+          Spacer(),
+          Padding(padding: EdgeInsets.all(20), child: Text('LEFT pad = move (works now!)\nRIGHT button = HOLD to SPRINT\nYou are 4x faster than hunters!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12))),
+          SizedBox(height: 100),
+        ]),
+        // Controls
+        Positioned(left: 20, bottom: 20, child: Container(width: 120, height: 120, decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle), child: Center(child: Text('🕹️', style: TextStyle(fontSize: 30))))),
+        Positioned(right: 20, bottom: 20, child: Container(width: 100, height: 100, decoration: BoxDecoration(color: Colors.white10, shape: BoxShape.circle), child: Center(child: Text('⚡\nHOLD\nSPRINT', textAlign: TextAlign.center, style: TextStyle(color: Colors.white24, fontSize: 10))))),
       ]),
     );
   }
+}
+
+class GamePainter extends CustomPainter {
+  final double px, py;
+  final List<Map<String,double>> hunters;
+  GamePainter(this.px, this.py, this.hunters);
+  @override
+  void paint(Canvas canvas, Size size){
+    var pPaint = Paint()..color = Color(0xFF00FF88);
+    var hPaint = Paint()..color = Colors.red;
+    canvas.drawCircle(Offset(px*size.width, py*size.height), 12, pPaint);
+    for(var h in hunters){
+      canvas.drawCircle(Offset(h['x']!*size.width, h['y']!*size.height), 10, hPaint);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
