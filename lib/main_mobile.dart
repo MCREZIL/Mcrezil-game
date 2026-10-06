@@ -1,83 +1,84 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:nearby_connections/nearby_connections.dart';
-import 'dart:typed_data';
-import 'dart:math';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
-void main() => runApp(MobileApp());
+void main() => runApp(MaterialApp(home: McrezilLobby(), debugShowCheckedModeBanner: false));
 
-class MobileApp extends StatelessWidget {
+class McrezilLobby extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, home: Lobby());
+  State<McrezilLobby> createState() => _McrezilLobbyState();
+}
+
+class _McrezilLobbyState extends State<McrezilLobby> {
+  final Strategy strategy = Strategy.P2P_CLUSTER;
+  String myName = "MCREZIL-${DateTime.now().millisecondsSinceEpoch % 1000}";
+  bool isHosting = false;
+  bool isJoining = false;
+  List<String> connected = [];
+  String status = "Players connected: 0";
+  bool showQr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _askPerms();
   }
-}
 
-class Lobby extends StatefulWidget {
-  @override
-  _LobbyState createState() => _LobbyState();
-}
+  Future<void> _askPerms() async {
+    await [
+      Permission.bluetoothAdvertise,
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.location,
+      Permission.nearbyWifiDevices,
+    ].request();
+  }
 
-class _LobbyState extends State<Lobby> {
-  final Nearby nearby = Nearby();
-  List<String> endpoints = [];
-  bool isHost = false;
-
-  void startHost() async {
-    setState(() => isHost = true);
+  void hostGame() async {
+    setState(() { isHosting = true; showQr = true; status = "Hosting as $myName..."; });
     try {
-      await nearby.startAdvertising(
-        "MCREZIL-HOST",
-        Strategy.P2P_STAR,
+      bool a = await Nearby().startAdvertising(
+        myName,
+        strategy,
         onConnectionInitiated: (id, info) {
-          nearby.acceptConnection(id,
-            onPayLoadRecieved: (eid, payload) {},
-            onPayloadTransferUpdate: (eid, update) {},
-          );
-          setState(() => endpoints.add(id));
+          Nearby().acceptConnection(id, onPayLoadRecieved: (ep, payload) {});
+          setState(() { connected.add(info.endpointName); status = "Players connected: ${connected.length}"; });
         },
-        onConnectionResult: (id, status) {},
-        onDisconnected: (id) {},
+        onConnectionResult: (id, result) {
+          if (result == Status.CONNECTED) {
+            setState(() { status = "Player joined! Total: ${connected.length}"; });
+          }
+        },
+        onDisconnected: (id) {
+          setState(() { status = "Player left"; });
+        },
       );
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Hosting... waiting for players")));
+      print("Advertising: $a");
     } catch (e) {
-      print(e);
+      setState(() { status = "Error: $e"; });
     }
   }
 
-  void startJoin() async {
-    try {
-      await nearby.startDiscovery(
-        "MCREZIL-HOST",
-        Strategy.P2P_STAR,
-        onEndpointFound: (id, name, service) {
-          nearby.requestConnection(name, id,
-            onConnectionInitiated: (id, info) {
-              nearby.acceptConnection(id,
-                onPayLoadRecieved: (eid, payload) {
-                  if(payload.type == PayloadType.BYTES){
-                    String msg = String.fromCharCodes(payload.bytes!);
-                    if(msg == "START") Navigator.push(context, MaterialPageRoute(builder: (_) => McrezilChase(isHost: false, nearby: nearby, endpoints: [id])));
-                  }
-                },
-                onPayloadTransferUpdate: (eid, update) {},
-              );
-            },
-            onConnectionResult: (id, status) {
-              if(status == Status.CONNECTED) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Connected to Host!")));
-            },
-            onDisconnected: (id) {},
-          );
-        },
-        onEndpointLost: (id) {},
-      );
-    } catch (e) { print(e); }
-  }
-
-  void sendStartToAll() {
-    for (var id in endpoints) {
-      nearby.sendBytesPayload(id, Uint8List.fromList("START".codeUnits));
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => McrezilChase(isHost: true, nearby: nearby, endpoints: endpoints)));
+  void joinGame() {
+    setState(() { isJoining = true; status = "Scanning for hosts..."; });
+    Nearby().startDiscovery(
+      myName,
+      strategy,
+      onEndpointFound: (id, name, serviceId) {
+        print("Found $name");
+        Nearby().requestConnection(name, id, onConnectionInitiated: (id, info) {
+          Nearby().acceptConnection(id, onPayLoadRecieved: (a,b){});
+        }, onConnectionResult: (id, res) {
+          setState(() { status = res == Status.CONNECTED ? "Connected to $name!" : "Failed to connect"; isJoining = false; });
+        }, onDisconnected: (id) {
+          setState(() { status = "Disconnected"; });
+        });
+      },
+      onEndpointLost: (id) {},
+    );
   }
 
   @override
@@ -85,81 +86,54 @@ class _LobbyState extends State<Lobby> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text("MCREZIL", style: TextStyle(color: Color(0xFF00FF88), fontSize: 50, fontWeight: FontWeight.bold)),
-          Text("OFFLINE MULTIPLAYER", style: TextStyle(color: Colors.white54, letterSpacing: 3)),
-          SizedBox(height: 40),
-          ElevatedButton(onPressed: startHost, style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF00FF88), minimumSize: Size(200, 50)), child: Text("HOST GAME", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
-          SizedBox(height: 20),
-          ElevatedButton(onPressed: startJoin, style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, minimumSize: Size(200, 50)), child: Text("JOIN GAME", style: TextStyle(color: Colors.white))),
-          SizedBox(height: 20),
-          if(isHost && endpoints.isNotEmpty) ElevatedButton(onPressed: sendStartToAll, child: Text("START MATCH (${endpoints.length} players)")),
-          SizedBox(height: 30),
-          Text("Players connected: ${endpoints.length}", style: TextStyle(color: Colors.white38)),
-        ]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text("MCREZIL", style: TextStyle(color: Color(0xFF00FF88), fontSize: 48, fontWeight: FontWeight.bold)),
+            Text("OFFLINE MULTIPLAYER", style: TextStyle(color: Colors.white54, letterSpacing: 2)),
+            SizedBox(height: 40),
+            
+            if (!showQr && !isJoining) ...[
+              ElevatedButton(
+                onPressed: hostGame,
+                style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF00FF88), minimumSize: Size(220,50)),
+                child: Text("HOST GAME", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+              SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: joinGame,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.white12, minimumSize: Size(220,50)),
+                child: Text("JOIN GAME", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+
+            if (showQr) ...[
+              Container(color: Colors.white, padding: EdgeInsets.all(10), child: QrImageView(data: myName, size: 200)),
+              SizedBox(height: 10),
+              Text(myName, style: TextStyle(color: Colors.white)),
+              Text("WiFi + Bluetooth ON", style: TextStyle(color: Colors.white54, fontSize: 12)),
+              SizedBox(height: 20),
+              ElevatedButton(onPressed: (){ Nearby().stopAdvertising(); setState((){showQr=false; isHosting=false;}); }, child: Text("STOP HOSTING")),
+            ],
+
+            if (isJoining && !showQr) ...[
+              SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Color(0xFF00FF88))),
+              SizedBox(height: 10),
+              Text("Looking for hosts via WiFi Direct...", style: TextStyle(color: Colors.white54)),
+              SizedBox(height: 20),
+              Container(height: 200, width: 200, child: MobileScanner(onDetect: (capture){
+                final code = capture.barcodes.first.rawValue;
+                if(code!=null){ print("Scanned $code"); }
+              })),
+              SizedBox(height: 20),
+              ElevatedButton(onPressed: (){ Nearby().stopDiscovery(); setState((){isJoining=false;}); }, child: Text("CANCEL")),
+            ],
+
+            SizedBox(height: 30),
+            Text(status, style: TextStyle(color: Colors.white38)),
+          ],
+        ),
       ),
     );
   }
-}
-
-// YOUR CHASE GAME - simplified for APK
-class McrezilChase extends StatefulWidget {
-  final bool isHost;
-  final Nearby nearby;
-  final List<String> endpoints;
-  McrezilChase({required this.isHost, required this.nearby, required this.endpoints});
-  @override
-  _McrezilChaseState createState() => _McrezilChaseState();
-}
-
-class _McrezilChaseState extends State<McrezilChase> with SingleTickerProviderStateMixin {
-  double px = 0.5, py = 0.8;
-  List<Map<String,double>> hunters = [];
-  int score = 0;
-  late AnimationController ctrl;
-
-  @override
-  void initState(){
-    super.initState();
-    hunters = List.generate(3, (_)=> {'x': Random().nextDouble(), 'y': Random().nextDouble()*0.5});
-    ctrl = AnimationController(vsync: this, duration: Duration(milliseconds: 16))..addListener((){
-      setState((){
-        for(var h in hunters){
-          double dx = px - h['x']!, dy = py - h['y']!;
-          double d = sqrt(dx*dx + dy*dy);
-          if(d < 0.08) { ctrl.stop(); return; }
-          h['x'] = h['x']! + dx/d * 0.003;
-          h['y'] = h['y']! + dy/d * 0.003;
-        }
-        score++;
-      });
-    })..repeat();
-  }
-
-  @override
-  Widget build(BuildContext context){
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        onPanUpdate: (d){ setState((){ px = (px + d.delta.dx / 300).clamp(0.0, 1.0); py = (py + d.delta.dy / 300).clamp(0.0, 1.0); }); },
-        child: Stack(children:[
-          CustomPaint(size: Size.infinite, painter: GamePainter(px, py, hunters)),
-          Positioned(top: 50, left: 20, child: Text("Score: $score", style: TextStyle(color: Colors.white))),
-        ]),
-      ),
-    );
-  }
-}
-
-class GamePainter extends CustomPainter {
-  final double px, py;
-  final List<Map<String,double>> hunters;
-  GamePainter(this.px, this.py, this.hunters);
-  @override
-  void paint(Canvas c, Size s){
-    c.drawCircle(Offset(px*s.width, py*s.height), 14, Paint()..color = Color(0xFF00FF88));
-    for(var h in hunters) c.drawCircle(Offset(h['x']!*s.width, h['y']!*s.height), 11, Paint()..color = Colors.red);
-  }
-  @override
-  bool shouldRepaint(covariant CustomPainter o) => true;
 }
