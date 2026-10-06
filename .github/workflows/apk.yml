@@ -10,33 +10,14 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: {flutter-version: '3.22.3'}
 
-      - name: Recreate Android
+      - name: Fix and Build
         run: |
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
-          
-          cat > android/settings.gradle << 'SET'
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties or -Pflutter.sdk not set."
-                  return flutterSdkPath
-              }()
-              settings.ext.flutterSdkPath = flutterSdkPath()
-              includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "7.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
-          }
-          include ":app"
-          SET
-
-          cat > pubspec.yaml << 'PUB'
+          # Fix Kotlin ONLY - safe replace
+          sed -i 's/org.jetbrains.kotlin.android" version ".*"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle
+          cat android/settings.gradle
+          cat > pubspec.yaml << 'EOF'
           name: mcrezil_game
           publish_to: 'none'
           version: 1.0.0+1
@@ -49,10 +30,12 @@ jobs:
             nearby_connections: ^4.3.0
           flutter:
             uses-material-design: true
-          PUB
+          EOF
           flutter pub get
           sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
 
-      - run: flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
-        with: {name: mcrezil-games-apk, path: build/app/outputs/flutter-apk/app-release.apk}
+        with:
+          name: mcrezil-games-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
