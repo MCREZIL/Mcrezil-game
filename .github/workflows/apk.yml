@@ -15,22 +15,27 @@ jobs:
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
           
+          # FIX 1: build.gradle - NO kotlin classpath here (new template)
           cat > android/build.gradle << 'GRADLE'
-          buildscript {
-              ext.kotlin_version = '1.9.22'
-              repositories { google(); mavenCentral() }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:7.4.2'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
               }
           }
-          allprojects { repositories { google(); mavenCentral() } }
           rootProject.buildDir = '../build'
-          subprojects { project.buildDir = "${rootProject.buildDir}/${project.name}" }
-          subprojects { project.evaluationDependsOn(':app') }
-          tasks.register("clean", Delete) { delete rootProject.buildDir }
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
           GRADLE
 
+          # FIX 2: settings.gradle - THIS is where kotlin version lives now
           cat > android/settings.gradle << 'SET'
           pluginManagement {
               def flutterSdkPath = {
@@ -42,19 +47,23 @@ jobs:
               }
               settings.ext.flutterSdkPath = flutterSdkPath()
               includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
           }
           plugins {
               id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "7.3.0" apply false
+              id "com.android.application" version "7.4.2" apply false
               id "org.jetbrains.kotlin.android" version "1.9.22" apply false
           }
           include ":app"
           SET
 
+          cat android/settings.gradle
           flutter pub get
-          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" \/>\n    <uses-permission android:name="android.permission.CAMERA" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
-          flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
+          flutter build apk --release --target lib/main_mobile.dart
 
       - uses: actions/upload-artifact@v4
         with: {name: mcrezil-games-apk, path: build/app/outputs/flutter-apk/app-release.apk}
