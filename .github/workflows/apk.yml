@@ -10,13 +10,25 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: {flutter-version: '3.22.3'}
 
-      - name: Fix and Build
+      - name: Fix Kotlin 1.7.1 -> 1.9.22
         run: |
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
-          # Fix Kotlin ONLY - safe replace
-          sed -i 's/org.jetbrains.kotlin.android" version ".*"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle
-          cat android/settings.gradle
+          echo "--- BEFORE ---"
+          grep -R "kotlin" android/build.gradle | head -5 || true
+          grep -R "kotlin" android/settings.gradle | head -5 || true
+          
+          # Patch BOTH old and new Flutter templates
+          sed -i "s/kotlin_version = '.*'/kotlin_version = '1.9.22'/" android/build.gradle || true
+          sed -i 's/kotlin_version = ".*"/kotlin_version = "1.9.22"/' android/build.gradle || true
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.22"/' android/build.gradle || true
+          sed -i 's/org.jetbrains.kotlin.android" version ".*"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle || true
+          sed -i "s/org.jetbrains.kotlin.android' version '.*'/org.jetbrains.kotlin.android' version '1.9.22'/" android/settings.gradle || true
+          
+          echo "--- AFTER ---"
+          grep -R "kotlin" android/build.gradle | head -5 || true
+          grep -R "kotlin" android/settings.gradle | head -5 || true
+
           cat > pubspec.yaml << 'EOF'
           name: mcrezil_game
           publish_to: 'none'
@@ -33,9 +45,7 @@ jobs:
           EOF
           flutter pub get
           sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
-          flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
 
+      - run: flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
-        with:
-          name: mcrezil-games-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+        with: {name: mcrezil-games-apk, path: build/app/outputs/flutter-apk/app-release.apk}
