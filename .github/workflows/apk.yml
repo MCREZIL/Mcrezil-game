@@ -10,26 +10,71 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: {flutter-version: '3.22.3'}
 
-      - name: Fix Kotlin 1.7.1 -> 1.9.22
+      - name: Force Kotlin 1.9.22
         run: |
           rm -rf android
           flutter create . --platforms android --project-name mcrezil_game
-          echo "--- BEFORE ---"
-          grep -R "kotlin" android/build.gradle | head -5 || true
-          grep -R "kotlin" android/settings.gradle | head -5 || true
           
-          # Patch BOTH old and new Flutter templates
-          sed -i "s/kotlin_version = '.*'/kotlin_version = '1.9.22'/" android/build.gradle || true
-          sed -i 's/kotlin_version = ".*"/kotlin_version = "1.9.22"/' android/build.gradle || true
-          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.22"/' android/build.gradle || true
-          sed -i 's/org.jetbrains.kotlin.android" version ".*"/org.jetbrains.kotlin.android" version "1.9.22"/' android/settings.gradle || true
-          sed -i "s/org.jetbrains.kotlin.android' version '.*'/org.jetbrains.kotlin.android' version '1.9.22'/" android/settings.gradle || true
-          
-          echo "--- AFTER ---"
-          grep -R "kotlin" android/build.gradle | head -5 || true
-          grep -R "kotlin" android/settings.gradle | head -5 || true
+          # OVERWRITE build.gradle completely - no more sed fail
+          cat > android/build.gradle << 'GRADLE'
+          buildscript {
+              ext.kotlin_version = '1.9.22'
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:7.4.2'
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          GRADLE
 
-          cat > pubspec.yaml << 'EOF'
+          cat > android/settings.gradle << 'SET'
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set"
+                  return flutterSdkPath
+              }
+              settings.ext.flutterSdkPath = flutterSdkPath()
+              includeBuild("${settings.ext.flutterSdkPath}/packages/flutter_tools/gradle")
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "7.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+          }
+          include ":app"
+          SET
+
+          cat android/build.gradle
+          cat android/settings.gradle
+
+          cat > pubspec.yaml << 'PUB'
           name: mcrezil_game
           publish_to: 'none'
           version: 1.0.0+1
@@ -42,9 +87,8 @@ jobs:
             nearby_connections: ^4.3.0
           flutter:
             uses-material-design: true
-          EOF
+          PUB
           flutter pub get
-          sed -i 's/<application/<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" \/>\n    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" \/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" \/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
       - run: flutter build apk --release --target lib/main_mobile.dart --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
